@@ -64,7 +64,7 @@ def store_predictions(predictions, table_name, timestamps, db_name="predictions.
 
 def main():
     all_stocks_db = "nifty50_data_v1.db"
-    predictions_db = "predictions.db"
+    predictions_db = "predictions/predictions.db"
     folder_name = "models"
     
     conn = sqlite3.connect(all_stocks_db)
