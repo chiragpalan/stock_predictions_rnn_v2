@@ -48,38 +48,18 @@ def generate_valid_timestamps(start_datetime, num_predictions=5):
     return timestamps
 
 # Function to store predictions
-def store_predictions(predictions, table_name, timestamps, db_path):
-    # Ensure the database exists in the predictions folder
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    conn = sqlite3.connect(db_path)
+def store_predictions(predictions, table_name, timestamps, db_name="predictions.db"):
+    conn = sqlite3.connect(db_name)
     cursor = conn.cursor()
-
-    # Create the table if it does not exist
-    cursor.execute(f"""
-    CREATE TABLE IF NOT EXISTS {table_name} (
-        Datetime TEXT PRIMARY KEY,
-        Predicted_Open REAL,
-        Predicted_High REAL,
-        Predicted_Low REAL,
-        Predicted_Close REAL,
-        Predicted_Volume REAL
-    );
-    """)
-    conn.commit()
-
-    # Insert or update predictions
-    for timestamp, prediction in zip(timestamps, predictions):
-        cursor.execute(f"""
-        INSERT INTO {table_name} (Datetime, Predicted_Open, Predicted_High, Predicted_Low, Predicted_Close, Predicted_Volume)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(Datetime) DO UPDATE SET
-            Predicted_Open=excluded.Predicted_Open,
-            Predicted_High=excluded.Predicted_High,
-            Predicted_Low=excluded.Predicted_Low,
-            Predicted_Close=excluded.Predicted_Close,
-            Predicted_Volume=excluded.Predicted_Volume;
-        """, (timestamp, *prediction[0]))
-    conn.commit()
+    df_predictions = pd.DataFrame({
+        'Datetime': timestamps,
+        'Predicted_Open': predictions[:, 0, 0],
+        'Predicted_High': predictions[:, 0, 1],
+        'Predicted_Low': predictions[:, 0, 2],
+        'Predicted_Close': predictions[:, 0, 3],
+        'Predicted_Volume': predictions[:, 0, 4],
+    })
+    df_predictions.to_sql(table_name, conn, if_exists='replace', index=False)
     conn.close()
 
 def main():
@@ -90,6 +70,7 @@ def main():
     conn = sqlite3.connect(all_stocks_db)
     tables_query = "SELECT name FROM sqlite_master WHERE type='table';"
     table_names = pd.read_sql(tables_query, conn)['name'].tolist()
+    table_names = [table_name for table_name in table_names if table_name != 'sqlite_sequence'] 
     
     for table_name in table_names:
         print(f"Predicting for table: {table_name}")
