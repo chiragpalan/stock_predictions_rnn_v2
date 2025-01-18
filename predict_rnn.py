@@ -6,7 +6,7 @@ from tensorflow.keras.models import load_model
 import pickle
 
 # Function to load data for prediction
-def load_data_for_prediction(table_name, conn, time_steps=30):
+def load_data_for_prediction(table_name, conn):
     df = pd.read_sql(f"SELECT * FROM {table_name};", conn)
     if 'Datetime' not in df.columns:
         raise KeyError(f"'Datetime' column not found in table {table_name}")
@@ -94,15 +94,17 @@ def main():
         
         X = preprocess_data_for_prediction(df, scaler)
         
-        # Select the last 150 instances for prediction
-        X_last_150 = X[-150:]
+        # Make predictions for all sequences in X
+        predictions = make_predictions(model, X, scaler)
         
-        latest_datetime = df['Datetime'].iloc[-1]
-        latest_datetime = latest_datetime.replace(tzinfo=None)  # Remove timezone information
-        timestamps = generate_valid_timestamps(latest_datetime, num_predictions=150)
+        # Generate corresponding timestamps for predictions
+        timestamps = []
+        for i in range(len(df) - len(predictions), len(df)):
+            latest_datetime = df['Datetime'].iloc[i]
+            latest_datetime = latest_datetime.replace(tzinfo=None)  # Remove timezone information
+            timestamps.extend(generate_valid_timestamps(latest_datetime, num_predictions=n_future))
         
-        predictions = make_predictions(model, X_last_150, scaler)
-        
+        # Store predictions
         store_predictions(predictions, f"{table_name}_predictions", timestamps, predictions_db)
     
     conn.close()
