@@ -48,7 +48,8 @@ def generate_valid_timestamps(start_datetime, num_predictions=5):
     return timestamps
 
 # Function to store predictions
-def store_predictions(predictions, table_name, timestamps, db_name="predictions.db"):
+def store_predictions(predictions, table_name, timestamps, db_name="predictions/predictions.db"):
+    os.makedirs(os.path.dirname(db_name), exist_ok=True)
     conn = sqlite3.connect(db_name)
     cursor = conn.cursor()
     df_predictions = pd.DataFrame({
@@ -91,11 +92,6 @@ def main():
         with open(scaler_path, 'rb') as f:
             scaler = pickle.load(f)
         
-        # Ensure scaler is not a numpy array
-        if isinstance(scaler, np.ndarray):
-            print(f"Scaler for {table_name} is not a valid scaler. Skipping...")
-            continue
-
         X = preprocess_data_for_prediction(df, scaler)
         
         # Select the last 150 instances for prediction
