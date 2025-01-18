@@ -26,6 +26,15 @@ jobs:
         mkdir -p predictions
         python predict_rnn.py
 
+    - name: Check for .db files in predictions directory
+      id: check-predictions
+      run: |
+        if ls predictions/*.db 1> /dev/null 2>&1; then
+          echo "::set-output name=has_db_files::true"
+        else
+          echo "::set-output name=has_db_files::false"
+        fi
+
     - name: Commit and push changes
       if: success() && steps.check-predictions.outputs.has_db_files == 'true'
       run: |
@@ -36,12 +45,3 @@ jobs:
         git push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Check for .db files in predictions directory
-      id: check-predictions
-      run: |
-        if ls predictions/*.db 1> /dev/null 2>&1; then
-          echo "::set-output name=has_db_files::true"
-        else
-          echo "::set-output name=has_db_files::false"
-        fi
