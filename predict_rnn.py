@@ -31,22 +31,6 @@ def make_predictions(model, X, scaler):
     predictions = scaler.inverse_transform(predictions.reshape(-1, predictions.shape[2])).reshape(predictions.shape)
     return predictions
 
-# Function to generate valid stock market open timestamps
-def generate_valid_timestamps(start_datetime, num_predictions=5):
-    timestamps = []
-    current_datetime = start_datetime
-    if current_datetime.time() >= pd.Timestamp('15:25').time():
-        current_datetime += pd.Timedelta(days=1)
-        current_datetime = current_datetime.replace(hour=9, minute=15)
-    while len(timestamps) < num_predictions:
-        if current_datetime.weekday() < 5 and current_datetime.time() >= pd.Timestamp('09:15').time() and current_datetime.time() <= pd.Timestamp('15:30').time():
-            timestamps.append(current_datetime)
-        current_datetime += pd.Timedelta(minutes=5)
-        if current_datetime.time() > pd.Timestamp('15:30').time():
-            current_datetime += pd.Timedelta(days=1)
-            current_datetime = current_datetime.replace(hour=9, minute=15)
-    return timestamps
-
 # Function to store predictions
 def store_predictions(predictions, table_name, timestamps, db_name="predictions.db"):
     conn = sqlite3.connect(db_name)
@@ -64,13 +48,14 @@ def store_predictions(predictions, table_name, timestamps, db_name="predictions.
 
 def main():
     all_stocks_db = "nifty50_data_v1.db"
-    predictions_db = "predictions/predictions.db"
+    predictions_db = "predictions.db"
     folder_name = "models"
     
     conn = sqlite3.connect(all_stocks_db)
     tables_query = "SELECT name FROM sqlite_master WHERE type='table';"
     table_names = pd.read_sql(tables_query, conn)['name'].tolist()
-    table_names = [table_name for table_name in table_names if table_name != 'sqlite_sequence'] 
+    
+    os.makedirs("predictions", exist_ok=True)
     
     for table_name in table_names:
         print(f"Predicting for table: {table_name}")
@@ -89,16 +74,21 @@ def main():
             continue
         
         model = load_model(model_path)
+        model.compile(optimizer='adam', loss='mean_squared_error')  # Ensure the model is compiled
+
         with open(scaler_path, 'rb') as f:
             scaler = pickle.load(f)
+        if not hasattr(scaler, 'transform'):
+            raise AttributeError(f"Scaler loaded from {scaler_path} is not a valid scaler object.")
         
         X = preprocess_data_for_prediction(df, scaler)
-        
+        if len(X) == 0:
+            print(f"Insufficient data for predictions for {table_name}. Skipping...")
+            continue
+
         # Select the last 150 instances for prediction
         X_last_150 = X[-150:]
-        
-        latest_datetime = df['Datetime'].iloc[-1]
-        latest_datetime = latest_datetime.replace(tzinfo=None)  # Remove timezone information
+        latest_datetime = df['Datetime'].iloc[-1].replace(tzinfo=None)
         timestamps = generate_valid_timestamps(latest_datetime, num_predictions=150)
         
         predictions = make_predictions(model, X_last_150, scaler)
