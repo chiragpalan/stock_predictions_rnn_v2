@@ -67,6 +67,8 @@ def main():
     predictions_db = "predictions/predictions.db"
     folder_name = "models"
     
+    n_future = 5  # Define n_future here
+    
     conn = sqlite3.connect(all_stocks_db)
     tables_query = "SELECT name FROM sqlite_master WHERE type='table';"
     table_names = pd.read_sql(tables_query, conn)['name'].tolist()
