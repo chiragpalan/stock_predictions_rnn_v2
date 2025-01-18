@@ -1,9 +1,7 @@
+import os
 import sqlite3
 import pandas as pd
 import numpy as np
-import os
-import tensorflow as tf
-from datetime import time, timedelta
 from tensorflow.keras.models import load_model
 import pickle
 
@@ -65,9 +63,9 @@ def store_predictions(predictions, table_name, timestamps, db_name="predictions.
     conn.close()
 
 def main():
-    all_stocks_db = 'nifty50_data_v1.db'
-    predictions_db = 'predictions/predictions.db'
-    folder_name = 'models'
+    all_stocks_db = "nifty50_data_v1.db"
+    predictions_db = "predictions/predictions.db"
+    folder_name = "models"
     
     conn = sqlite3.connect(all_stocks_db)
     tables_query = "SELECT name FROM sqlite_master WHERE type='table';"
