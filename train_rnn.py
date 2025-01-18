@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, GRU, Dense, Dropout
 from sklearn.preprocessing import MinMaxScaler
-import joblib
+import pickle
 from tensorflow.keras.losses import MeanSquaredError
 import random
 
@@ -75,7 +75,7 @@ def main():
         model_path = os.path.join('models', f'{table_name}_model.h5')
         scaler_path = os.path.join('models', f'{table_name}_scaler.pkl')
         model.save(model_path)
-        joblib.dump(scaler, scaler_path)
+        pickle.dump(scaler, scaler_path)
 
 if __name__ == "__main__":
     main()
