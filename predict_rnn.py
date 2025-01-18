@@ -14,6 +14,7 @@ def load_data_for_prediction(table_name, conn, time_steps=30):
     df.dropna(subset=['Datetime'], inplace=True)
     df.drop_duplicates(subset=['Datetime'], inplace=True)
     df.sort_values('Datetime', inplace=True)
+    print(df.tail())
     return df
 
 # Function to preprocess data for prediction
