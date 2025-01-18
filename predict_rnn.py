@@ -6,7 +6,7 @@ from tensorflow.keras.models import load_model
 import pickle
 
 # Function to load data for prediction
-def load_data_for_prediction(table_name, conn):
+def load_data_for_prediction(table_name, conn, time_steps=30):
     df = pd.read_sql(f"SELECT * FROM {table_name};", conn)
     if 'Datetime' not in df.columns:
         raise KeyError(f"'Datetime' column not found in table {table_name}")
@@ -52,7 +52,7 @@ def store_predictions(predictions, table_name, timestamps, db_name="predictions.
     conn = sqlite3.connect(db_name)
     cursor = conn.cursor()
     df_predictions = pd.DataFrame({
-        'Datetime': timestamps,
+        'Datetime': timestamps[:len(predictions)],  # Ensure timestamps and predictions have the same length
         'Predicted_Open': predictions[:, 0, 0],
         'Predicted_High': predictions[:, 0, 1],
         'Predicted_Low': predictions[:, 0, 2],
@@ -101,10 +101,14 @@ def main():
         
         # Generate corresponding timestamps for predictions
         timestamps = []
-        for i in range(len(df) - len(predictions), len(df)):
-            latest_datetime = df['Datetime'].iloc[i]
+        for i in range(len(predictions)):
+            latest_datetime = df['Datetime'].iloc[i + len(df) - len(predictions)]
             latest_datetime = latest_datetime.replace(tzinfo=None)  # Remove timezone information
             timestamps.extend(generate_valid_timestamps(latest_datetime, num_predictions=n_future))
+        
+        # Ensure the timestamps and predictions arrays are of the same length
+        if len(timestamps) > len(predictions):
+            timestamps = timestamps[:len(predictions)]
         
         # Store predictions
         store_predictions(predictions, f"{table_name}_predictions", timestamps, predictions_db)
