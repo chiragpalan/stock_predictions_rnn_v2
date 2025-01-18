@@ -64,7 +64,7 @@ def store_predictions(predictions, table_name, timestamps, db_name="predictions.
 
 def main():
     all_stocks_db = "nifty50_data_v1.db"
-    predictions_db = "predictions/predictions.db"
+    predictions_db = "predictions.db"
     folder_name = "models"
     
     conn = sqlite3.connect(all_stocks_db)
@@ -91,6 +91,11 @@ def main():
         with open(scaler_path, 'rb') as f:
             scaler = pickle.load(f)
         
+        # Ensure scaler is not a numpy array
+        if isinstance(scaler, np.ndarray):
+            print(f"Scaler for {table_name} is not a valid scaler. Skipping...")
+            continue
+
         X = preprocess_data_for_prediction(df, scaler)
         
         # Select the last 150 instances for prediction
