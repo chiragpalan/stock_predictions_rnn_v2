@@ -75,7 +75,7 @@ def main():
         model_path = os.path.join('models', f'{table_name}_model.h5')
         scaler_path = os.path.join('models', f'{table_name}_scaler.pkl')
         model.save(model_path)
-        pickle.dump(scaler, scaler_path)
-
+        with open(scaler_path, 'wb') as f:
+            pickle.dump(scaler, f)
 if __name__ == "__main__":
     main()
