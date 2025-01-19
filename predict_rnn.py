@@ -14,7 +14,6 @@ def load_data_for_prediction(table_name, conn, time_steps=30):
     df.dropna(subset=['Datetime'], inplace=True)
     df.drop_duplicates(subset=['Datetime'], inplace=True)
     df.sort_values('Datetime', inplace=True)
-    print(df.tail())
     return df
 
 # Function to preprocess data for prediction
@@ -53,7 +52,7 @@ def store_predictions(predictions, table_name, timestamps, db_name="predictions.
     conn = sqlite3.connect(db_name)
     cursor = conn.cursor()
     df_predictions = pd.DataFrame({
-        'Datetime': timestamps[:len(predictions)],  # Ensure timestamps and predictions have the same length
+        'Datetime': timestamps,
         'Predicted_Open': predictions[:, 0, 0],
         'Predicted_High': predictions[:, 0, 1],
         'Predicted_Low': predictions[:, 0, 2],
@@ -67,8 +66,6 @@ def main():
     all_stocks_db = "nifty50_data_v1.db"
     predictions_db = "predictions/predictions.db"
     folder_name = "models"
-    
-    n_future = 5  # Define n_future here
     
     conn = sqlite3.connect(all_stocks_db)
     tables_query = "SELECT name FROM sqlite_master WHERE type='table';"
@@ -97,21 +94,15 @@ def main():
         
         X = preprocess_data_for_prediction(df, scaler)
         
-        # Make predictions for all sequences in X
-        predictions = make_predictions(model, X, scaler)
+        # Select the last 150 instances for prediction
+        X_last_150 = X[-30:]
         
-        # Generate corresponding timestamps for predictions
-        timestamps = []
-        for i in range(len(predictions)):
-            latest_datetime = df['Datetime'].iloc[i + len(df) - len(predictions)]
-            latest_datetime = latest_datetime.replace(tzinfo=None)  # Remove timezone information
-            timestamps.extend(generate_valid_timestamps(latest_datetime, num_predictions=n_future))
+        latest_datetime = df['Datetime'].iloc[-1]
+        latest_datetime = latest_datetime.replace(tzinfo=None)  # Remove timezone information
+        timestamps = generate_valid_timestamps(latest_datetime, num_predictions=30)
         
-        # Ensure the timestamps and predictions arrays are of the same length
-        if len(timestamps) > len(predictions):
-            timestamps = timestamps[:len(predictions)]
+        predictions = make_predictions(model, X_last_150, scaler)
         
-        # Store predictions
         store_predictions(predictions, f"{table_name}_predictions", timestamps, predictions_db)
     
     conn.close()
