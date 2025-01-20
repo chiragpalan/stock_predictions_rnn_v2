@@ -51,6 +51,11 @@ def generate_valid_timestamps(start_datetime, num_predictions=5):
 def store_predictions(predictions, table_name, timestamps, db_name="predictions.db"):
     conn = sqlite3.connect(db_name)
     cursor = conn.cursor()
+    
+    # Check if the table already exists
+    cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}';")
+    table_exists = cursor.fetchone() is not None
+    
     df_predictions = pd.DataFrame({
         'Datetime': timestamps,
         'Predicted_Open': predictions[:, 0, 0],
@@ -59,7 +64,14 @@ def store_predictions(predictions, table_name, timestamps, db_name="predictions.
         'Predicted_Close': predictions[:, 0, 3],
         'Predicted_Volume': predictions[:, 0, 4],
     })
-    df_predictions.to_sql(table_name, conn, if_exists='replace', index=False)
+    
+    if table_exists:
+        # Append the new predictions to the existing table
+        df_predictions.to_sql(table_name, conn, if_exists='append', index=False)
+    else:
+        # Create a new table if it does not exist
+        df_predictions.to_sql(table_name, conn, if_exists='replace', index=False)
+    
     conn.close()
 
 def main():
