@@ -29,4 +29,5 @@ jobs:
         git config --global user.email "actions@github.com"
         git add models/
         git commit -m "Add trained models and scalers"
+        git pull --rebase https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/chiragpalan/stock_predictions_rnn_v2.git main
         git push https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/chiragpalan/stock_predictions_rnn_v2.git HEAD:main
