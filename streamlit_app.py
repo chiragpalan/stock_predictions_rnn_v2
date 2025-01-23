@@ -1,40 +1,25 @@
+import streamlit as st
 import sqlite3
 import pandas as pd
-import streamlit as st
 import plotly.graph_objects as go
 from datetime import datetime
 
-# Set page configuration for a better layout
-st.set_page_config(layout="wide")
-
-# Function to fetch table names from the database
+# Function to fetch table names from a database
 def fetch_table_names(db_path):
     conn = sqlite3.connect(db_path)
     tables = [t[0] for t in conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()]
     conn.close()
     return tables
 
-# Fetch available tables from both actual and predicted databases
-actual_db_path = 'nifty50_data_v1.db'
-pred_db_path = 'predictions/predictions.db'
-actual_tables = fetch_table_names(actual_db_path)
-pred_tables = fetch_table_names(pred_db_path)
-
-# Combine actual and predicted table names for selection
-table_options = list(set(actual_tables) & set([t.replace('_predictions', '') for t in pred_tables]))
-
-# Create the dropdown menu for table selection
-selected_table = st.selectbox("Select Table", table_options)
-
-# Function to load the selected table's data and plot the candlestick chart
-def load_and_plot_data(selected_table):
+# Function to load and plot data for a specific table
+def load_and_plot_data(actual_db_path, pred_db_path, selected_table):
     # Connect to the databases
     actual_conn = sqlite3.connect(actual_db_path)
     pred_conn = sqlite3.connect(pred_db_path)
 
-    # Load the actual and predicted data based on selected table
-    actual_df = pd.read_sql(f"SELECT * FROM {selected_table} ORDER BY Datetime DESC;", actual_conn)
-    pred_df = pd.read_sql(f"SELECT * FROM {selected_table}_predictions ORDER BY Datetime DESC;", pred_conn)
+    # Load the actual and predicted data
+    actual_df = pd.read_sql(f"SELECT * FROM {selected_table} ORDER BY Datetime;", actual_conn)
+    pred_df = pd.read_sql(f"SELECT * FROM {selected_table}_predictions ORDER BY Datetime;", pred_conn)
 
     actual_conn.close()
     pred_conn.close()
@@ -43,73 +28,50 @@ def load_and_plot_data(selected_table):
     actual_df['Datetime'] = pd.to_datetime(actual_df['Datetime'], errors='coerce').dt.tz_localize(None)
     pred_df['Datetime'] = pd.to_datetime(pred_df['Datetime'], errors='coerce').dt.tz_localize(None)
 
-    # Drop duplicate entries in the 'Datetime' column by keeping the last entry
+    # Drop duplicate entries in the 'Datetime' column by keeping the last occurrence
     actual_df = actual_df.drop_duplicates(subset=['Datetime'], keep='last')
     pred_df = pred_df.drop_duplicates(subset=['Datetime'], keep='last')
 
-    # Add helper column 'Time' for the time component from the 'Datetime' column
-    actual_df['Time'] = actual_df['Datetime'].dt.time
-    pred_df['Time'] = pred_df['Datetime'].dt.time
+    # Filter data to only include stock market open hours (9:15 AM to 3:30 PM IST)
+    market_hours = (pred_df['Datetime'].dt.time >= datetime.strptime('09:15', '%H:%M').time()) & \
+                   (pred_df['Datetime'].dt.time <= datetime.strptime('15:30', '%H:%M').time())
+    pred_df = pred_df[market_hours]
 
-    # Filter data to only include stock market open hours
-    market_open = actual_df['Time'] >= pd.to_datetime('09:15').time()
-    market_close = actual_df['Time'] <= pd.to_datetime('15:30').time()
-    actual_df = actual_df[market_open & market_close]
-
-    pred_open = pred_df['Time'] >= pd.to_datetime('09:15').time()
-    pred_close = pred_df['Time'] <= pd.to_datetime('15:30').time()
-    pred_df = pred_df[pred_open & pred_close]
-
-    # Combine actual and predicted data for x-axis range slider
-    combined_df = pd.concat([actual_df, pred_df])
-    combined_df.sort_values(by='Datetime', inplace=True)
-
-    # Convert Timestamps to datetime objects for Streamlit slider
-    min_datetime = combined_df['Datetime'].min().to_pydatetime()
-    max_datetime = combined_df['Datetime'].max().to_pydatetime()
-
-    # Streamlit slider for x-axis date and time range selection
-    datetime_range = st.slider(
-        "Select Date and Time Range",
-        min_value=min_datetime,
-        max_value=max_datetime,
-        value=(min_datetime, max_datetime),
-        format="YYYY-MM-DD HH:mm"
+    # Perform a left join of predictions (base) with actuals
+    merged_df = pd.merge(
+        pred_df,
+        actual_df,
+        on='Datetime',
+        how='left',
+        suffixes=('_pred', '')  # No suffix for actual data
     )
-
-    # Filter data based on the selected datetime range from the slider
-    filtered_actual_df = actual_df[(actual_df['Datetime'] >= datetime_range[0]) & (actual_df['Datetime'] <= datetime_range[1])]
-    filtered_pred_df = pred_df[(pred_df['Datetime'] >= datetime_range[0]) & (pred_df['Datetime'] <= datetime_range[1])]
 
     # Plot the candlestick chart using Plotly
     fig = go.Figure()
 
-    # Add actual data to the chart
-    fig.add_trace(go.Candlestick(
-        x=filtered_actual_df['Datetime'],
-        open=filtered_actual_df['Open'],
-        high=filtered_actual_df['High'],
-        low=filtered_actual_df['Low'],
-        close=filtered_actual_df['Close'],
-        name='Actual Data',
-        increasing_line_color='green',
-        decreasing_line_color='red',
-        increasing_fillcolor='rgba(0,255,0,0.2)',
-        decreasing_fillcolor='rgba(255,0,0,0.2)',
-    ))
+    # Add actual data to the chart (if available)
+    if not merged_df[['Open', 'High', 'Low', 'Close']].isnull().all().all():
+        fig.add_trace(go.Candlestick(
+            x=merged_df['Datetime'],
+            open=merged_df['Open'],
+            high=merged_df['High'],
+            low=merged_df['Low'],
+            close=merged_df['Close'],
+            name='Actual Data',
+            increasing_line_color='green',
+            decreasing_line_color='red',
+        ))
 
     # Add predicted data to the chart
     fig.add_trace(go.Candlestick(
-        x=filtered_pred_df['Datetime'],
-        open=filtered_pred_df['Predicted_Open'],
-        high=filtered_pred_df['Predicted_High'],
-        low=filtered_pred_df['Predicted_Low'],
-        close=filtered_pred_df['Predicted_Close'],
+        x=merged_df['Datetime'],
+        open=merged_df['Predicted_Open'],
+        high=merged_df['Predicted_High'],
+        low=merged_df['Predicted_Low'],
+        close=merged_df['Predicted_Close'],
         name='Predicted Data',
         increasing_line_color='blue',
         decreasing_line_color='orange',
-        increasing_fillcolor='rgba(0,0,255,0.2)',
-        decreasing_fillcolor='rgba(255,165,0,0.2)',
     ))
 
     # Update layout for better visuals
@@ -127,12 +89,35 @@ def load_and_plot_data(selected_table):
         yaxis=dict(
             showgrid=True
         ),
-        width=1200,  # Set width to fit 12 inches on your screen
+        width=1200,
         height=600
     )
 
-    st.plotly_chart(fig, use_container_width=True)  # Use container width to ensure the chart uses full width
+    return fig
 
-# Load and display the data when a table is selected
-if selected_table:
-    load_and_plot_data(selected_table)
+# Streamlit App
+def main():
+    st.title("Stock Data Viewer with Predictions")
+
+    # Database paths
+    actual_db_path = 'stock_datamanagement/nifty50_data_v1.db'
+    pred_db_path = 'stock_datamanagement/predictions/predictions.db'
+
+    # Fetch table names
+    actual_tables = fetch_table_names(actual_db_path)
+    pred_tables = fetch_table_names(pred_db_path)
+
+    # Combine actual and predicted table names for selection
+    table_options = list(set(actual_tables) & set([t.replace('_predictions', '') for t in pred_tables]))
+
+    # Table selection
+    selected_table = st.selectbox("Select a table:", table_options)
+
+    if selected_table:
+        st.write(f"Displaying data for: {selected_table}")
+        # Load and plot data
+        fig = load_and_plot_data(actual_db_path, pred_db_path, selected_table)
+        st.plotly_chart(fig, use_container_width=True)
+
+if __name__ == "__main__":
+    main()
