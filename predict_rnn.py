@@ -107,11 +107,11 @@ def main():
         X = preprocess_data_for_prediction(df, scaler)
         
         # Select the last 150 instances for prediction
-        X_last_150 = X[-15:]
+        X_last_150 = X[-9:]
         
         latest_datetime = df['Datetime'].iloc[-1]
         latest_datetime = latest_datetime.replace(tzinfo=None)  # Remove timezone information
-        timestamps = generate_valid_timestamps(latest_datetime, num_predictions=15)
+        timestamps = generate_valid_timestamps(latest_datetime, num_predictions=9)
         
         predictions = make_predictions(model, X_last_150, scaler)
         
