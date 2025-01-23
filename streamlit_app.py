@@ -100,8 +100,8 @@ def main():
     st.title("Stock Data Viewer with Predictions")
 
     # Database paths
-    actual_db_path = 'stock_datamanagement/nifty50_data_v1.db'
-    pred_db_path = 'stock_datamanagement/predictions/predictions.db'
+    actual_db_path = 'nifty50_data_v1.db'
+    pred_db_path = 'predictions/predictions.db'
 
     # Fetch table names
     actual_tables = fetch_table_names(actual_db_path)
